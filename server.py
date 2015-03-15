@@ -5,7 +5,6 @@ import psycopg2.extras
 from flask import Flask, session
 from flask.ext.socketio import SocketIO, emit
 
-serialID = 0
 
 app = Flask(__name__, static_url_path='')
 app.config['SECRET_KEY'] = 'secret!'
@@ -57,12 +56,13 @@ def new_message(message):
     messages.append(tmp)
     emit('message', tmp, broadcast=True)
     #######################################################start here with message sql queries
-    query = "insert into data (id, message) values (%s, %s);"
-    #query = "insert into data (id, message) values (" + serialID + ", " + message + ");"
-    print serialID
+    #query = "insert into data (id, message) values ('" + session['id'] + "', '" + message + "');"
+    query = "insert into data (id, message) values (%s,%s);"
     try:
-        cur.execute(query, (serialID, message))
         #cur.execute(query)
+        #cur.execute(query, (serialID, message))
+        cur.execute(query, (session['id'], message))
+        print "successful message query"
     except:
         print("Error executing query")
         print query
@@ -82,9 +82,9 @@ def on_login(data):
     query = "select id from users WHERE name = %s AND password = crypt(%s, password);"
     try:
         cur.execute(query, (data['name'], data['password']))
-        session['serialID'] = cur.fetchone()
-        print session['serialID']
-        print serialID
+        serialID = cur.fetchone()
+        session['id'] = str(serialID[0])
+        print session['id']
     except:
         print("Error executing query")
         print query
