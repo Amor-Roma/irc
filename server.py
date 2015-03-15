@@ -1,7 +1,10 @@
 import os
 import uuid
+import psycopg2
+import psycopg2.extras
 from flask import Flask, session
 from flask.ext.socketio import SocketIO, emit
+
 
 app = Flask(__name__, static_url_path='')
 app.config['SECRET_KEY'] = 'secret!'
@@ -10,6 +13,13 @@ socketio = SocketIO(app)
 
 messages = [{'text':'test', 'name':'testName'}]
 users = {}
+
+def connectToDB():
+  connectionString = 'dbname=irc user=postgres password=Amorroma host=localhost'
+  try:
+    return psycopg2.connect(connectionString)
+  except:
+    print("Can't connect to database")
 
 def updateRoster():
     names = []
