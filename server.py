@@ -10,11 +10,11 @@ app = Flask(__name__, static_url_path='')
 app.config['SECRET_KEY'] = 'secret!'
 app.secret_key = os.urandom(24).encode('hex')
 
-
 socketio = SocketIO(app)
 
-messages = [{'text':'test', 'name':'testName'}]
+messages = []
 users = {}
+
 
 def connectToDB():
   connectionString = 'dbname=irc user=postgres password=Amorroma host=localhost'
@@ -44,25 +44,50 @@ def test_connect():
     print 'connected'
     users[session['uuid']]={'username':'New User'}
     updateRoster()
-
-
     for message in messages:
         emit('message', message)
+        
+        
+        
+        
+        
+@socketio.on('search', namespace='/chat')
+def new_search(term):
+    query = "SELECT users.name, data.message FROM users INNER JOIN data ON users.id = data.id WHERE data.message LIKE '%%%s%%';"
+    try:
+        cur.execute(query % (term))
+        results = cur.fetchall()
+        print "successful search query"
+        for result in results :
+            result = {'name':result['name'], 'text' :result['message']}
+            emit('search', result)
+    except:
+        print("Error executing query")
+        print query
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
 
 @socketio.on('message', namespace='/chat')
 def new_message(message):
-    #tmp = {'text':message, 'name':'testName'}
     tmp = {'text':message, 'name':users[session['uuid']]['username']}
-    messages.append(tmp)
-    emit('message', tmp, broadcast=True)
-    #######################################################start here with message sql queries
-    #query = "insert into data (id, message) values ('" + session['id'] + "', '" + message + "');"
     query = "insert into data (id, message) values (%s,%s);"
     try:
-        #cur.execute(query)
-        #cur.execute(query, (serialID, message))
         cur.execute(query, (session['id'], message))
         print "successful message query"
+        conn.commit()
+        messages.append(tmp)
+        emit('message', tmp, broadcast=True)
+        print query
     except:
         print("Error executing query")
         print query
@@ -81,24 +106,35 @@ def on_login(data):
     results = ''
     query = "select id from users WHERE name = %s AND password = crypt(%s, password);"
     try:
+        session['id'] = 'none'
         cur.execute(query, (data['name'], data['password']))
         serialID = cur.fetchone()
         session['id'] = str(serialID[0])
         print session['id']
+        emit('loginSuccess')
     except:
         print("Error executing query")
+    query = "SELECT users.name, data.message FROM data INNER JOIN users ON data.id = users.id WHERE users.id = %s FETCH FIRST 10 ROWS ONLY;"
+    try:
+        cur.execute(query, (session['id']))
+        messages = cur.fetchall()
+        for message in messages:
+            message = {'name':message['name'], 'text' :message['message']}
+            emit('message', message)
+        print "get user messages susscessful"
+    except:
+        print("ERROR getting user messages")
         print query
     #users[session['uuid']]={'username':message}
     #updateRoster()
 
-
-    
 @socketio.on('disconnect', namespace='/chat')
 def on_disconnect():
     print 'disconnect'
     if session['uuid'] in users:
         del users[session['uuid']]
         updateRoster()
+        session.pop('uuid', None)
 
 @app.route('/')
 def hello_world():
